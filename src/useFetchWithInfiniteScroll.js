@@ -1,7 +1,8 @@
 import _ from 'lodash'
 import { useEffect, useRef, useReducer } from 'react'
 import axios from 'axios'
-import { CONTENTFUL_REST_URL, convertContentfulEntryResponse } from '../utils/contentful'
+
+const POKEMON_API = 'https://pokeapi.co/api/v2/pokemon'
 
 /**
  * Determine if there are more posts to display on the next page
