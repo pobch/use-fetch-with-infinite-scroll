@@ -2,42 +2,11 @@ import _ from 'lodash'
 import { useEffect, useRef, useReducer } from 'react'
 import axios from 'axios'
 
-const POKEMON_API = 'https://pokeapi.co/api/v2/pokemon'
-
-/**
- * Determine if there are more posts to display on the next page
- * @param {number} total total posts
- * @param {number} skip skipped posts
- * @param {number} limit the number of posts on the current page
- */
-const nextPage = (total, skip, limit) => {
-  return total > skip + limit
-}
-
-/**
- * Transform Contentful API's response
- * @param {{
- *  items: Array,
- *  includes: {
- *    Entry: Array,
- *    Asset: Array
- *  },
- * }} data Contentful's response
- * @returns {Object<string, any>}
- */
-const constructPostData = data => {
-  const posts = _.get(data, 'items')
-  const entries = _.get(data, 'includes.Entry', [])
-  const assets = _.get(data, 'includes.Asset', [])
-  const formattedResponse = convertContentfulEntryResponse(posts, [...assets, ...entries])
-  return formattedResponse
-}
-
 /**
  * @typedef {Object<string, any>} Action
  * @property {string} type
  * @property {Object<string, any>} [payload] Contentful API's response
- * @property {number} [resetSkipPostsTo] Post amount of the first page
+ * @property {number} [resetSkipPokemonsTo] Pokemon amount of the first page
  */
 /**
  * Reducer to be used inside hook
@@ -50,33 +19,33 @@ const reducer = (state, action) => {
     case 'FETCH_START':
       return { ...state, isLoading: true, isError: false }
     case 'FETCH_FIRST_PAGE_SUCCESS': {
-      const { total, skip, limit, items } = action.payload
-      let posts
-      if (_.isEmpty(items)) {
-        posts = []
+      const { count, next, previous, results } = action.payload
+      let pokemons
+      if (_.isEmpty(results)) {
+        pokemons = []
       } else {
-        posts = constructPostData(action.payload)
+        pokemons = results
       }
       return {
-        posts,
+        pokemons,
         isLoading: false,
         isError: false,
-        skipPosts: action.resetSkipPostsTo,
-        hasNextPage: nextPage(total, skip, limit)
+        skipPokemons: action.resetSkipPokemonsTo,
+        hasNextPage: !_.isEmpty(next)
       }
     }
     case 'FETCH_MORE_SUCCESS': {
-      // Fetched posts cannot be empty [] because we check hasNextPage before fetching
-      // Therefore, no need to check isEmpty(posts)
-      const { total, skip, limit } = action.payload
-      const newPosts = constructPostData(action.payload)
+      // Fetched pokemons cannot be empty [] because we check hasNextPage before fetching
+      // Therefore, no need to check isEmpty(pokemons)
+      const { count, next, previous, results } = action.payload
+      const morePokemons = results
       return {
         ...state,
-        posts: [...state.posts, ...newPosts],
+        pokemons: [...state.pokemons, ...morePokemons],
         isLoading: false,
         isError: false,
-        skipPosts: state.skipPosts + Number(limit),
-        hasNextPage: nextPage(total, skip, limit)
+        skipPokemons: state.skipPokemons + results.length,
+        hasNextPage: !_.isEmpty(next)
       }
     }
     case 'FETCH_FAIL':
@@ -88,62 +57,57 @@ const reducer = (state, action) => {
 
 /**
  *
- * @param {number} firstPagePostAmount
- * @param {number} nextPagePostAmount
- * @param {string} [query = ''] query to be concated to the url according to
- *      Contentful's REST API documentation, e.g. "&fields.tag=education"
+ * @param {string} basePokemonAPI URL of the REST API
+ * @param {number} firstPagePokemonAmount
+ * @param {number} nextPagePokemonAmount
  * @param {number} [distanceFromBottomToFetchNextPage = 0] distance from
  *      the bottom of the page (in px) to trigger infinite scrolling
- * @returns {{ posts: Array, isLoading: boolean, isError: boolean }} note that isLoading will
+ * @returns {{ pokemons: Array, isLoading: boolean, isError: boolean }} note that isLoading will
  *      be true not only while fetching the first page but also while fetching
  *      the next page through infinite scrolling
  */
-export const useFetctPostsWithInfiniteScroll = (
-  firstPagePostAmount,
-  nextPagePostAmount,
-  query = '',
+export const useFetchingWithInfiniteScroll = (
+  basePokemonAPI,
+  firstPagePokemonAmount,
+  nextPagePokemonAmount,
   distanceFromBottomToFetchNextPage = 0
 ) => {
   const isFetchingNextPage = useRef(false)
   const [state, dispatch] = useReducer(reducer, {
-    posts: [],
+    pokemons: [],
     isLoading: false,
     isError: false,
-    skipPosts: firstPagePostAmount,
+    skipPokemons: firstPagePokemonAmount,
     hasNextPage: false
   })
 
-  // Fetch posts of the first page
+  // Fetch pokemons of the first page
   useEffect(() => {
-    const FIRST_PAGE_QUERY =
-      `${CONTENTFUL_REST_URL}&content_type=post&include=1` +
-      `${query}&order=-fields.publishDate` +
-      `&limit=${firstPagePostAmount}`
+    const FIRST_PAGE_QUERY = `${basePokemonAPI}?limit=${firstPagePokemonAmount}`
 
-    const findPosts = async () => {
+    const fetchFirstPage = async () => {
       dispatch({ type: 'FETCH_START' })
       try {
         const response = await axios.get(FIRST_PAGE_QUERY)
         dispatch({
           type: 'FETCH_FIRST_PAGE_SUCCESS',
           payload: _.get(response, 'data', {}),
-          resetSkipPostsTo: firstPagePostAmount
+          resetSkipPokemonsTo: firstPagePokemonAmount
         })
       } catch (e) {
-        console.log(`Error when trying to fetch posts by query: ${query}`, e)
+        console.log(`Error when trying to fetch pokemons by ${FIRST_PAGE_QUERY}`, e)
         dispatch({ type: 'FETCH_FAIL' })
       }
     }
 
-    findPosts()
-  }, [firstPagePostAmount, query])
+    fetchFirstPage()
+  }, [basePokemonAPI, firstPagePokemonAmount])
 
-  // (Infinite Scroll) Fetch next page posts when scrolling to the bottom of the previous page
+  // (Infinite Scroll) Fetch next page when scrolling to the bottom of the previous page
   useEffect(() => {
-    const NEXT_PAGE_QUERY =
-      `${CONTENTFUL_REST_URL}&content_type=post&include=1` +
-      `${query}&order=-fields.publishDate` +
-      `&limit=${nextPagePostAmount}&skip=${state.skipPosts}`
+    const NEXT_PAGE_QUERY = `${basePokemonAPI}?limit=${nextPagePokemonAmount}&offset=${
+      state.skipPokemons
+    }`
 
     const fetchNextPage = async () => {
       isFetchingNextPage.current = true
@@ -155,11 +119,7 @@ export const useFetctPostsWithInfiniteScroll = (
           payload: _.get(response, 'data', {})
         })
       } catch (e) {
-        console.log(
-          `Error when trying to fetch more posts of query: ${query}` +
-            `, limit: ${nextPagePostAmount} and skip: ${state.skipPosts}`,
-          e
-        )
+        console.log(`Error when trying to fetch more pokemon from ${NEXT_PAGE_QUERY}`, e)
         dispatch({ type: 'FETCH_FAIL' })
       }
       isFetchingNextPage.current = false
@@ -190,12 +150,16 @@ export const useFetctPostsWithInfiniteScroll = (
     window.addEventListener('scroll', handleInfiniteScroll)
     return () => window.removeEventListener('scroll', handleInfiniteScroll)
   }, [
-    query,
-    nextPagePostAmount,
+    basePokemonAPI,
     distanceFromBottomToFetchNextPage,
-    state.skipPosts,
-    state.hasNextPage
+    nextPagePokemonAmount,
+    state.hasNextPage,
+    state.skipPokemons
   ])
 
-  return { posts: state.posts, isLoading: state.isLoading, isError: state.isError }
+  return {
+    pokemons: state.pokemons,
+    isLoading: state.isLoading,
+    isError: state.isError
+  }
 }
