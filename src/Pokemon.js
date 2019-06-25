@@ -3,12 +3,17 @@ import axios from 'axios'
 import React, { useEffect, useState } from 'react'
 
 const StyledCard = styled.div`
-  background-color: #333;
+  background-color: #eee;
+  width: 150px;
+  padding: 10px;
+  margin-bottom: 10px;
 `
 
 const StyledName = styled.div`
+  color: #444;
   &::first-letter {
     text-transform: uppercase;
+    font-weight: bold;
   }
 `
 
