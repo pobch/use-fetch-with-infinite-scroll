@@ -1,5 +1,24 @@
+import styled from 'styled-components'
 import axios from 'axios'
 import React, { useEffect, useState } from 'react'
+
+const StyledCard = styled.div`
+  background-color: #333;
+`
+
+const StyledName = styled.div`
+  &::first-letter {
+    text-transform: uppercase;
+  }
+`
+
+const StyledImgWrapper = styled.div`
+  height: 150px;
+`
+
+const StyledImg = styled.img`
+  height: 100%;
+`
 
 const Pokemon = props => {
   const { name, url } = props
@@ -19,12 +38,12 @@ const Pokemon = props => {
   }, [url])
 
   return (
-    <React.Fragment>
-      <div>{name}</div>
-      <div>
-        <img src={picURL} alt={name} />
-      </div>
-    </React.Fragment>
+    <StyledCard>
+      <StyledName>{name}</StyledName>
+      <StyledImgWrapper>
+        <StyledImg src={picURL} alt={name} />
+      </StyledImgWrapper>
+    </StyledCard>
   )
 }
 
