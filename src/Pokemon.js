@@ -2,6 +2,9 @@ import styled from 'styled-components'
 import axios from 'axios'
 import React, { useEffect, useState } from 'react'
 
+/**----------------------------------------------
+ * STYLES
+ ------------------------------------------------*/
 const StyledCard = styled.div`
   background-color: #eee;
   width: 150px;
@@ -25,6 +28,9 @@ const StyledImg = styled.img`
   height: 100%;
 `
 
+/**----------------------------------------------
+ * MAIN COMPONENT
+ ------------------------------------------------*/
 const Pokemon = props => {
   const { name, url } = props
   const [picURL, setPicURL] = useState('')
